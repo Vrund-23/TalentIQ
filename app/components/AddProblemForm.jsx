@@ -5,7 +5,7 @@ import { Loader2, Plus, Trash2, Code2 } from 'lucide-react';
 
 export default function AddProblemForm({ contestId, onSuccess }) {
     const [loading, setLoading] = useState(false);
-    const [testCases, setTestCases] = useState([{ input: '', output: '' }]); // Start with 1 empty case
+    const [testCases, setTestCases] = useState([{ input: '', output: '', isPublic: false }]); // Start with 1 empty case
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -28,7 +28,7 @@ export default function AddProblemForm({ contestId, onSuccess }) {
 
     const addTestCase = () => {
         if (testCases.length < 5) {
-            setTestCases([...testCases, { input: '', output: '' }]);
+            setTestCases([...testCases, { input: '', output: '', isPublic: false }]);
         }
     };
 
@@ -70,7 +70,7 @@ export default function AddProblemForm({ contestId, onSuccess }) {
                     inputFormat: '',
                     outputFormat: ''
                 });
-                setTestCases([{ input: '', output: '' }]);
+                setTestCases([{ input: '', output: '', isPublic: false }]);
             } else {
                 alert(data.error || 'Failed to add problem');
             }
@@ -187,6 +187,16 @@ export default function AddProblemForm({ contestId, onSuccess }) {
                                     className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm font-mono text-white h-16"
                                     required
                                 />
+                                <div className="mt-2 flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id={`public-${index}`}
+                                        checked={tc.isPublic || false}
+                                        onChange={(e) => handleTestCaseChange(index, 'isPublic', e.target.checked)}
+                                        className="rounded bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <label htmlFor={`public-${index}`} className="text-xs text-slate-400 select-none cursor-pointer">Mark as Public Example</label>
+                                </div>
                             </div>
                             {testCases.length > 1 && (
                                 <button

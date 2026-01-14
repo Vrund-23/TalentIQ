@@ -126,9 +126,11 @@ export default function DashboardClient({ initialRole }) {
                         </button>
                     )}
                     {isPast && (
-                        <button className="w-full py-3 border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2">
-                            View Solutions
-                        </button>
+                        <Link href={`/contest/${contest._id}`} className="w-full">
+                            <button className="w-full py-3 border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2">
+                                View Solutions
+                            </button>
+                        </Link>
                     )}
 
                     {/* Volunteer/Admin Actions */}

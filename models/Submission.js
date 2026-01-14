@@ -6,6 +6,10 @@ const SubmissionSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
+    contestId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Contest',
+    },
     problemSlug: {
         type: String,
         required: true,
@@ -20,8 +24,8 @@ const SubmissionSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compilation Error'],
-        default: 'Accepted', // Simplified for now
+        enum: ['Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compilation Error'],
+        default: 'Pending',
     },
     createdAt: {
         type: Date,

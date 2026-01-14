@@ -27,8 +27,10 @@ export async function GET(req, { params }) {
 
         const now = new Date();
         const startTime = new Date(contest.startTime);
+        const endTime = new Date(contest.endTime);
         const isStudent = session.user.role === 'student';
         const isUpcoming = now < startTime;
+        const isEnded = now >= endTime;
 
         // 2. Security Check
         // If student AND contest hasn't started, hide problems
@@ -44,6 +46,8 @@ export async function GET(req, { params }) {
                     endTime: contest.endTime,
                     questionCount: contest.questionCount,
                     status: 'upcoming',
+                    isEnded: false,
+                    userScore: 0,
                     problems: [] // Explicitly empty
                 }
             });
@@ -56,7 +60,7 @@ export async function GET(req, { params }) {
             model: Problem
         }).lean();
 
-        // 4. Solve Status Integration
+        // 4. Solve Status Integration & Score Calculation
         const problemSlugs = contest.problems.map(p => p.slug);
         const submissions = await Submission.find({
             userId: session.user.id,
@@ -78,18 +82,30 @@ export async function GET(req, { params }) {
             }
         });
 
-        // 5. Attach status to problems
-        const problemsWithStatus = contest.problems.map(prob => ({
-            ...prob,
-            userStatus: statusMap[prob.slug] || 'unsolved'
-        }));
+        // 5. Attach status and calculate score
+        let earnedScore = 0;
+        const problemsWithStatus = contest.problems.map(prob => {
+            const status = statusMap[prob.slug] || 'unsolved';
+            if (status === 'solved') earnedScore++;
+            return {
+                ...prob,
+                userStatus: status
+            };
+        });
+
+        // Calculate 'userScore' (assuming 1 point per problem for now, or sum of difficulty weights)
+        // User requested 'userScore'. Let's return the count of solved problems as the score for simplicity 
+        // effectively same as the leaderboard logic.
 
         return NextResponse.json({
             success: true,
             data: {
                 ...contest,
                 problems: problemsWithStatus,
-                status: now > new Date(contest.endTime) ? 'past' : (isUpcoming ? 'upcoming' : 'live')
+                status: isEnded ? 'past' : (isUpcoming ? 'upcoming' : 'live'),
+                isEnded: isEnded,
+                userScore: earnedScore,
+                totalProblems: contest.problems.length
             }
         });
 
