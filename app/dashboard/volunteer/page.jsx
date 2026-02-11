@@ -22,9 +22,13 @@ export default async function VolunteerDashboard() {
 
     const now = new Date();
 
-    const liveContests = await Contest.find({ startTime: { $lte: now }, endTime: { $gt: now } }).sort({ endTime: 1 }).lean();
-    const upcomingContests = await Contest.find({ startTime: { $gt: now } }).sort({ startTime: 1 }).lean();
-    const pastContests = await Contest.find({ endTime: { $lte: now } }).sort({ endTime: -1 }).lean();
+    const liveContestsData = await Contest.find({ startTime: { $lte: now }, endTime: { $gt: now } }).sort({ endTime: 1 }).lean();
+    const upcomingContestsData = await Contest.find({ startTime: { $gt: now } }).sort({ startTime: 1 }).lean();
+    const pastContestsData = await Contest.find({ endTime: { $lte: now } }).sort({ endTime: -1 }).lean();
+
+    const liveContests = JSON.parse(JSON.stringify(liveContestsData));
+    const upcomingContests = JSON.parse(JSON.stringify(upcomingContestsData));
+    const pastContests = JSON.parse(JSON.stringify(pastContestsData));
 
     const activeCount = liveContests.length;
     const upcomingCount = upcomingContests.length;
@@ -155,7 +159,7 @@ export default async function VolunteerDashboard() {
                                             <div className="flex justify-between items-start mb-4">
                                                 <div>
                                                     <h4 className="text-lg font-bold text-white">{contest.title}</h4>
-                                                    <p className="text-sm text-[#94A3B8]">Ends at {new Date(contest.endTime).toLocaleTimeString()}</p>
+                                                    <p suppressHydrationWarning className="text-sm text-[#94A3B8]">Ends at {new Date(contest.endTime).toLocaleTimeString()}</p>
                                                 </div>
                                                 <span className="flex items-center gap-1.5 text-xs font-bold text-[#22D3EE] bg-[#22D3EE]/10 border border-[#22D3EE]/20 px-3 py-1 rounded-full animate-pulse">
                                                     ● LIVE
@@ -205,7 +209,7 @@ export default async function VolunteerDashboard() {
                                     <div key={contest._id} className="bg-[#111827] border border-[#3B82F6]/8 rounded-2xl p-6 hover:border-[#3B82F6]/20 transition-all group">
                                         <div className="flex justify-between items-start mb-4">
                                             <h4 className="text-lg font-bold text-white group-hover:text-[#3B82F6] transition-colors">{contest.title}</h4>
-                                            <span className="text-xs font-bold text-[#3B82F6] bg-[#3B82F6]/10 border border-[#3B82F6]/20 px-2 py-1 rounded">
+                                            <span suppressHydrationWarning className="text-xs font-bold text-[#3B82F6] bg-[#3B82F6]/10 border border-[#3B82F6]/20 px-2 py-1 rounded">
                                                 {new Date(contest.startTime).toLocaleDateString()}
                                             </span>
                                         </div>
@@ -213,7 +217,7 @@ export default async function VolunteerDashboard() {
                                         <div className="space-y-2 text-sm text-[#94A3B8]/60 mb-6">
                                             <div className="flex justify-between">
                                                 <span>Start Time:</span>
-                                                <span className="text-[#E2E8F0]/70">{new Date(contest.startTime).toLocaleTimeString()}</span>
+                                                <span suppressHydrationWarning className="text-[#E2E8F0]/70">{new Date(contest.startTime).toLocaleTimeString()}</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span>Duration:</span>

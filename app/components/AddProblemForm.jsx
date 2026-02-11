@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useEffect } from 'react';
-import { Loader2, Plus, Trash2, Code2, Save } from 'lucide-react';
+import { Loader2, Plus, Trash2, Code2, Save, Sparkles } from 'lucide-react';
 
 export default function AddProblemForm({ contestId, onSuccess, initialData = null, problemId = null }) {
     const isEditMode = !!problemId;
@@ -14,8 +14,53 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
         constraints: '',
         tags: '',
         inputFormat: '',
-        outputFormat: ''
+        outputFormat: '',
+        starterCode: {
+            cpp: '',
+            java: '',
+            python: '',
+            javascript: ''
+        }
     });
+    const [activeTab, setActiveTab] = useState('cpp');
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [generating, setGenerating] = useState(false);
+
+    const generateWithAI = async () => {
+        if (!aiPrompt.trim()) return;
+        setGenerating(true);
+        try {
+            const res = await fetch('/api/generate-problem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: aiPrompt })
+            });
+            const data = await res.json();
+            if (data.success) {
+                const { problem } = data;
+                setFormData({
+                    title: problem.title || '',
+                    description: problem.description || '',
+                    difficulty: problem.difficulty || 'Medium',
+                    constraints: problem.constraints || '',
+                    tags: Array.isArray(problem.tags) ? problem.tags.join(', ') : '',
+                    inputFormat: problem.inputFormat || '',
+                    outputFormat: problem.outputFormat || '',
+                    starterCode: problem.starterCode || { cpp: '', java: '', python: '', javascript: '' }
+                });
+                if (problem.testCases) {
+                    setTestCases(problem.testCases);
+                }
+            } else {
+                alert(data.error || 'Failed to generate problem');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Something went wrong while generating the problem');
+        } finally {
+            setGenerating(false);
+        }
+    };
 
     useEffect(() => {
         if (initialData) {
@@ -26,7 +71,8 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
                 constraints: initialData.constraints || '',
                 tags: Array.isArray(initialData.tags) ? initialData.tags.join(', ') : (initialData.tags || ''),
                 inputFormat: initialData.inputFormat || '',
-                outputFormat: initialData.outputFormat || ''
+                outputFormat: initialData.outputFormat || '',
+                starterCode: initialData.starterCode || { cpp: '', java: '', python: '', javascript: '' }
             });
             if (initialData.testCases && initialData.testCases.length > 0) {
                 setTestCases(initialData.testCases);
@@ -90,7 +136,8 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
                         constraints: '',
                         tags: '',
                         inputFormat: '',
-                        outputFormat: ''
+                        outputFormat: '',
+                        starterCode: { cpp: '', java: '', python: '', javascript: '' }
                     });
                     setTestCases([{ input: '', output: '', isPublic: false }]);
                 }
@@ -111,6 +158,34 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
                 <Code2 className="w-5 h-5 text-[#3B82F6]" />
                 {isEditMode ? 'Edit Problem' : 'Add Problem to Contest'}
             </h3>
+
+            <div className="bg-[#1E293B]/50 p-4 rounded-lg border border-[#3B82F6]/20 mb-6">
+                <label className="block text-sm font-medium text-[#94A3B8] mb-2 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#3B82F6]" />
+                    AI Problem Generator
+                </label>
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        placeholder="e.g., LeetCode 1 Two Sum, Linear Search, Matrix Rotation"
+                        className="flex-1 px-4 py-2 bg-[#0A0E1A] border border-[#3B82F6]/10 rounded-lg text-white focus:ring-2 focus:ring-[#3B82F6] outline-none text-sm"
+                    />
+                    <button
+                        type="button"
+                        onClick={generateWithAI}
+                        disabled={generating || !aiPrompt.trim()}
+                        className="px-6 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        Generate
+                    </button>
+                </div>
+                <p className="text-[10px] text-[#64748B] mt-2">
+                    Enter a problem name or topic. AI will fill title, description, constraints, and test cases (2 public, 3 hidden).
+                </p>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
@@ -199,6 +274,33 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
             </div>
 
             <div className="border-t border-[#3B82F6]/10 pt-6">
+                <h4 className="font-semibold text-[#E2E8F0] mb-4">Starter Code Templates</h4>
+                <div className="bg-[#1E293B] rounded-lg border border-[#3B82F6]/10 overflow-hidden mb-6">
+                    <div className="flex border-b border-[#3B82F6]/10">
+                        {['cpp', 'java', 'python', 'javascript'].map((lang) => (
+                            <button
+                                key={lang}
+                                type="button"
+                                onClick={() => setActiveTab(lang)}
+                                className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === lang ? 'bg-[#3B82F6]/10 text-[#3B82F6] border-b-2 border-[#3B82F6]' : 'text-[#94A3B8] hover:text-white'}`}
+                            >
+                                {lang === 'cpp' ? 'C++' : lang.charAt(0).toUpperCase() + lang.slice(1)}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="p-0">
+                        <textarea
+                            value={formData.starterCode?.[activeTab] || ''}
+                            onChange={(e) => setFormData({
+                                ...formData,
+                                starterCode: { ...formData.starterCode, [activeTab]: e.target.value }
+                            })}
+                            className="w-full h-48 bg-[#0A0E1A] p-4 text-white font-mono text-sm outline-none resize-none"
+                            placeholder={`Enter ${activeTab} starter code here...`}
+                        />
+                    </div>
+                </div>
+
                 <div className="flex justify-between items-center mb-4">
                     <h4 className="font-semibold text-[#E2E8F0]">Test Cases</h4>
                     <button

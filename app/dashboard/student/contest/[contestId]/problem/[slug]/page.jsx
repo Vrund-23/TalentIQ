@@ -75,7 +75,8 @@ export default function ProblemPage({ params: paramsPromise }) {
 
     const handleLanguageChange = (newLang) => {
         setLanguage(newLang);
-        setCode(templates[newLang]); // Simple replace for now
+        const template = problem?.starterCode?.[newLang] || templates[newLang] || "";
+        setCode(template);
     };
 
     const fetchProblem = async () => {
@@ -84,6 +85,17 @@ export default function ProblemPage({ params: paramsPromise }) {
             const data = await res.json();
             if (data.success) {
                 setProblem(data.data);
+
+                // If no user code is saved, populate with DB starter code
+                const savedCode = localStorage.getItem(CODE_KEY);
+                if (!savedCode) {
+                    const currentLang = localStorage.getItem(LANG_KEY) || 'javascript';
+                    const dbTemplate = data.data.starterCode?.[currentLang];
+                    // Only override if we have a specific template from DB
+                    if (dbTemplate) {
+                        setCode(dbTemplate);
+                    }
+                }
             }
         } catch (error) {
             console.error('Failed to fetch problem', error);
