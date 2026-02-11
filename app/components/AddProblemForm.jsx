@@ -1,7 +1,9 @@
 
 'use client';
 import { useState, useEffect } from 'react';
-import { Loader2, Plus, Trash2, Code2, Save, Sparkles } from 'lucide-react';
+import { Loader2, Plus, Trash2, Code2, Save, Sparkles, Camera, Eye, Edit2 } from 'lucide-react';
+
+
 
 export default function AddProblemForm({ contestId, onSuccess, initialData = null, problemId = null }) {
     const isEditMode = !!problemId;
@@ -29,6 +31,83 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
     const [cfContestId, setCfContestId] = useState('');
     const [cfIndex, setCfIndex] = useState('');
     const [generating, setGenerating] = useState(false);
+    const [botLoading, setBotLoading] = useState(false);
+    const [descTab, setDescTab] = useState('write'); // 'write' | 'preview'
+
+    const handleBotImport = async () => {
+        if (!cfContestId.trim() || !cfIndex.trim()) {
+            alert("Please enter Contest ID and Index");
+            return;
+        }
+
+        setBotLoading(true);
+        try {
+            const problemUrl = `https://codeforces.com/problemset/problem/${cfContestId}/${cfIndex}`;
+
+            // Call the local bot server (make sure server.js is running on port 5000)
+            const res = await fetch('http://localhost:5000/api/add-problem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: problemUrl })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                // Determine if title is already set, if not try to build one
+                const currentTitle = formData.title || `Problem ${cfContestId}${cfIndex}`;
+
+                // Append the image to the description
+                const imageMarkdown = `![Problem Screenshot](${data.imageUrl})`;
+                const newDescription = formData.description
+                    ? `${formData.description}\n\n${imageMarkdown}`
+                    : imageMarkdown;
+
+                // 2. Call Gemini to analyze the image and generate test cases
+                let extractedData = {};
+                try {
+                    const aiPayload = { imageUrl: data.imageUrl };
+                    const aiRes = await fetch('/api/generate-problem', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(aiPayload)
+                    });
+                    const aiData = await aiRes.json();
+                    if (aiData.success && aiData.problem) {
+                        extractedData = aiData.problem;
+                    }
+                } catch (e) {
+                    console.error("AI Analysis failed:", e);
+                }
+
+                setFormData(prev => ({
+                    ...prev,
+                    title: extractedData.title || currentTitle,
+                    description: newDescription,
+                    difficulty: extractedData.difficulty || 'Medium',
+                    constraints: extractedData.constraints || '',
+                    tags: Array.isArray(extractedData.tags) ? extractedData.tags.join(', ') : '',
+                    inputFormat: extractedData.inputFormat || '',
+                    outputFormat: extractedData.outputFormat || '',
+                    starterCode: extractedData.starterCode || { cpp: '', java: '', python: '', javascript: '' }
+                }));
+
+                if (extractedData.testCases) {
+                    setTestCases(extractedData.testCases);
+                }
+
+                setDescTab('preview'); // Switch to preview to show the image immediately
+                alert("Screenshot captured and analyzed by AI!");
+            } else {
+                alert(data.error || "Failed to capture screenshot. Is the bot server (port 5000) running?");
+            }
+        } catch (error) {
+            console.error("Bot Error:", error);
+            alert("Failed to connect to bot server. Make sure server.js is running on port 5000.");
+        } finally {
+            setBotLoading(false);
+        }
+    };
 
     const generateWithAI = async () => {
         let payload = {};
@@ -167,6 +246,33 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
         }
     };
 
+    // Simplified Markdown Image Renderer for Preview
+    const renderDescriptionPreview = (text) => {
+        if (!text) return <p className="text-slate-500 italic">No description provided.</p>;
+
+        // Split by image markdown: ![alt](url)
+        const parts = text.split(/(!\[.*?\]\(.*?\))/g);
+
+        return parts.map((part, index) => {
+            const imageMatch = part.match(/!\[(.*?)\]\((.*?)\)/);
+            if (imageMatch) {
+                return (
+                    <div key={index} className="my-4 rounded-lg overflow-hidden border border-white/10">
+                        <img
+                            src={imageMatch[2]}
+                            alt={imageMatch[1] || "Problem Image"}
+                            className="w-full object-contain max-h-[500px] bg-black"
+                        />
+                    </div>
+                );
+            }
+            // Render text paragraphs (very basic)
+            return part.split('\n').map((line, i) => (
+                <p key={`${index}-${i}`} className="text-slate-300 text-sm mb-2 min-h-[1em] whitespace-pre-wrap">{line}</p>
+            ));
+        });
+    };
+
     return (
         <form onSubmit={handleSubmit} className="space-y-6 bg-[#111827] border border-[#3B82F6]/10 p-6 rounded-xl mt-6">
             <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
@@ -238,15 +344,27 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
                             className="px-6 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
                         >
                             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                            Generate
+                            Generate (AI)
                         </button>
+
+                        {platform === 'codeforces' && (
+                            <button
+                                type="button"
+                                onClick={handleBotImport}
+                                disabled={botLoading || !cfContestId.trim() || !cfIndex.trim()}
+                                className="px-6 py-2 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
+                            >
+                                {botLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                                Fetch Screenshot (Bot)
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 <p className="text-[10px] text-[#64748B] mt-2">
                     {platform === 'custom' && "Enter a problem name or topic. AI will fill details."}
                     {platform === 'leetcode' && "Enter a LeetCode problem title or URL. AI will retrieve details."}
-                    {platform === 'codeforces' && "Enter Codeforces Contest ID and Problem Index. AI will retrieve details."}
+                    {platform === 'codeforces' && "Enter Codeforces Contest ID and Problem Index. Use 'Generate' for AI text, or 'Fetch Screenshot' for an image capture."}
                 </p>
             </div>
 
@@ -264,15 +382,40 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
                 </div>
 
                 <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-[#94A3B8] mb-1">Description</label>
-                    <textarea
-                        name="description"
-                        value={formData.description}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2.5 bg-[#1E293B] border border-[#3B82F6]/10 rounded-lg text-white focus:ring-2 focus:ring-[#3B82F6] outline-none h-32 font-mono text-sm"
-                        placeholder="Problem statement..."
-                        required
-                    />
+                    <div className="flex justify-between items-end mb-2">
+                        <label className="block text-sm font-medium text-[#94A3B8]">Description</label>
+                        <div className="flex bg-[#0F1420] rounded-lg p-1 gap-1 border border-[#3B82F6]/10">
+                            <button
+                                type="button"
+                                onClick={() => setDescTab('write')}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-2 transition-colors ${descTab === 'write' ? 'bg-[#3B82F6] text-white' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <Edit2 className="w-3 h-3" /> Write
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDescTab('preview')}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-2 transition-colors ${descTab === 'preview' ? 'bg-[#3B82F6] text-white' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <Eye className="w-3 h-3" /> Preview
+                            </button>
+                        </div>
+                    </div>
+
+                    {descTab === 'write' ? (
+                        <textarea
+                            name="description"
+                            value={formData.description}
+                            onChange={handleChange}
+                            className="w-full px-4 py-2.5 bg-[#1E293B] border border-[#3B82F6]/10 rounded-lg text-white focus:ring-2 focus:ring-[#3B82F6] outline-none h-64 font-mono text-sm resize-y"
+                            placeholder="Problem statement (Markdown supported)..."
+                            required
+                        />
+                    ) : (
+                        <div className="w-full px-4 py-4 bg-[#1E293B] border border-[#3B82F6]/10 rounded-lg min-h-[16rem] h-auto overflow-y-auto max-h-[500px]">
+                            {renderDescriptionPreview(formData.description)}
+                        </div>
+                    )}
                 </div>
 
                 <div className="md:col-span-2 grid grid-cols-2 gap-4">

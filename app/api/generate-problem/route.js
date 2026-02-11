@@ -23,7 +23,7 @@ async function fetchCodeforcesMetadata(contestId, index) {
 export async function POST(req) {
     try {
         const body = await req.json();
-        const { platform, prompt } = body;
+        const { platform, prompt, imageUrl } = body;
 
         if (!process.env.GEMINI_API_KEY) {
             throw new Error("GEMINI_API_KEY is not defined");
@@ -100,6 +100,75 @@ export async function POST(req) {
                     finalProblemData.title = metadata.title;
                 } else {
                     return NextResponse.json({ error: "Failed to generate problem content" }, { status: 500 });
+                }
+            }
+
+        } else if (imageUrl) {
+            // Image-Based Generation (from Screenshot)
+            console.log("Generating problem from image URL:", imageUrl);
+
+            const imageResp = await fetch(imageUrl);
+            if (!imageResp.ok) throw new Error("Failed to fetch image from URL");
+
+            const arrayBuffer = await imageResp.arrayBuffer();
+            const base64Image = Buffer.from(arrayBuffer).toString("base64");
+
+            const prompt = `
+                Analyze this image of a competitive programming problem.
+                Extract the problem details and generate a JSON object with the following structure:
+                {
+                    "title": "Problem Title (extract from image)",
+                    "description": "Create a short summary of the problem logic. Do not write the full story if it's long, just the core task.",
+                    "difficulty": "Medium",
+                    "constraints": "Extract constraints (e.g. N <= 10^5)",
+                    "inputFormat": "Extract input format",
+                    "outputFormat": "Extract output format",
+                    "tags": ["Array", "Math", " Greedy"],
+                    "testCases": [
+                        { "input": "...", "output": "...", "isPublic": true },
+                        { "input": "...", "output": "...", "isPublic": true },
+                        { "input": "...", "output": "...", "isPublic": false },
+                        { "input": "...", "output": "...", "isPublic": false },
+                         { "input": "...", "output": "...", "isPublic": false }
+                    ],
+                    "starterCode": {
+                        "cpp": "// C++ starter...",
+                        "java": "// Java starter...",
+                        "python": "# Python starter...",
+                        "javascript": "// JS starter..."
+                    }
+                }
+                
+                Ensure there are exactly 2 public and 3 hidden test cases.
+                For "starterCode", create a class-based solution with an empty method body.
+                
+                Return ONLY the JSON.
+            `;
+
+            const result = await model.generateContent([
+                prompt,
+                {
+                    inlineData: {
+                        data: base64Image,
+                        mimeType: "image/png" // Assuming PNG from ImageKit, but could check
+                    }
+                }
+            ]);
+
+            const text = result.response.text().replace(/```json/g, "").replace(/```/g, "").trim();
+
+            // Try parsing JSON
+            try {
+                finalProblemData = JSON.parse(text);
+                // Force description to be the image markdown if desired, 
+                // but user asked for Gemini to give test cases primarily. 
+                // The frontend handles the description image rendering.
+            } catch (e) {
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    finalProblemData = JSON.parse(jsonMatch[0]);
+                } else {
+                    throw new Error("Failed to parse AI response as JSON");
                 }
             }
 
