@@ -1,67 +1,38 @@
-# Base image
-FROM node:20-slim AS base
+# 1. Use the official Puppeteer image (Includes Chrome + Node.js)
+FROM ghcr.io/puppeteer/puppeteer:latest
 
-# Install dependencies only when needed
-FROM base AS deps
-WORKDIR /app
+# 2. Set the working directory inside the container
+WORKDIR /usr/src/app
 
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json ./
-# Skip chromium download for build step
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+# 3. Copy package files first (for better caching)
+COPY package*.json ./
+
+# 4. Install dependencies
+# We use 'npm ci' for a clean, reliable install
 RUN npm ci
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# 5. Copy the rest of your application code
 COPY . .
 
-# Next.js telemetry disable
-ENV NEXT_TELEMETRY_DISABLED 1
+# --- MAGIC FIX: TRICK NEXT.JS BUILD ---
+# Next.js tries to connect to the DB during build.
+# We give it a fake URL so it doesn't crash.
+ENV MONGODB_URI="mongodb://mock_url_for_build_only"
+# --------------------------------------
 
-# Build the project
+# 6. Build the Next.js application
+# This creates the .next folder
 RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
-
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
-
-# Install Google Chrome Stable and fonts
-# Note: this installs the necessary libs to make the browser work with Puppeteer.
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/googlechrome-linux-keyring.gpg \
-    && sh -c 'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/googlechrome-linux-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf libxss1 --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Add user so we don't need --no-sandbox.
-RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
-    && mkdir -p /home/pptruser/Downloads \
-    && chown -R pptruser:pptruser /home/pptruser \
-    && chown -R pptruser:pptruser /app
-
-COPY --from=builder /app/public ./public
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=pptruser:pptruser /app/.next/standalone ./
-COPY --from=builder --chown=pptruser:pptruser /app/.next/static ./.next/static
-
+# 7. Switch to the non-root user (Required for Puppeteer security)
 USER pptruser
 
+# 8. Expose the port your app runs on
 EXPOSE 3000
 
-ENV PORT 3000
-# set hostname to localhost
-ENV HOSTNAME "0.0.0.0"
-
+# 9. Start the app
+# IF you have a custom server.js, keep this:
 CMD ["node", "server.js"]
+
+# IF you usually run "npm start", change the line above to:
+# CMD ["npm", "start"]
