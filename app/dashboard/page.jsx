@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import LogoutButton from '@/app/components/LogoutButton';
 import dbConnect from '@/lib/db';
 import Submission from '@/models/Submission';
+import Contest from '@/models/Contest';
 import StatsSection from '@/app/components/StatsSection';
 import DashboardClient from './DashboardClient';
 import { Zap } from 'lucide-react';
@@ -24,9 +25,23 @@ export default async function DashboardPage() {
     await dbConnect();
 
     let solvedCount = 0;
+    let contestsParticipated = 0;
+    let acceptanceRate = 0;
+    let totalSubmissions = 0;
     try {
+        // Problems solved
         const solvedProblems = await Submission.distinct('problemSlug', { userId, status: 'Accepted' });
         solvedCount = solvedProblems.length;
+
+        // Contests participated
+        contestsParticipated = await Contest.countDocuments({ registeredUsers: userId });
+
+        // Total submissions & acceptance rate
+        totalSubmissions = await Submission.countDocuments({ userId });
+        if (totalSubmissions > 0) {
+            const acceptedSubmissions = await Submission.countDocuments({ userId, status: 'Accepted' });
+            acceptanceRate = Math.round((acceptedSubmissions / totalSubmissions) * 100);
+        }
     } catch (error) {
         console.error("Error fetching stats:", error);
     }
@@ -67,7 +82,12 @@ export default async function DashboardPage() {
                     <h2 className="text-3xl font-bold text-white mb-2">Welcome Back, {sessionUser.name.split(' ')[0]}</h2>
                     <p className="text-[#94A3B8]">Here is your progress overview.</p>
                 </div>
-                <StatsSection solvedCount={solvedCount} />
+                <StatsSection
+                    solvedCount={solvedCount}
+                    contestsParticipated={contestsParticipated}
+                    acceptanceRate={acceptanceRate}
+                    totalSubmissions={totalSubmissions}
+                />
                 <DashboardClient initialRole={sessionUser.role} userId={userId} />
             </main>
         </div>
