@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Clock, FileQuestion, Calendar as CalendarIcon, ArrowLeft, MoreVertical, Loader2 } from 'lucide-react';
+import { Plus, Clock, FileQuestion, Calendar as CalendarIcon, ArrowLeft, MoreVertical, Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 import CreateContestForm from '@/app/components/CreateContestForm';
 import AddProblemForm from '@/app/components/AddProblemForm';
 import ContestLeaderboard from '@/app/components/ContestLeaderboard';
@@ -14,6 +15,10 @@ export default function ContestsPage() {
     const [contests, setContests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [contestToDelete, setContestToDelete] = useState(null);
+    const [adminPassword, setAdminPassword] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
     
     // Derived state from URL
     const selectedContest = contests.find(c => c._id === contestId);
@@ -57,6 +62,41 @@ export default function ContestsPage() {
             case 'ongoing': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
             case 'completed': return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
             default: return 'bg-slate-500/10 text-slate-400';
+        }
+    };
+
+    const handleDeleteClick = (e, contest) => {
+        e.stopPropagation();
+        setContestToDelete(contest);
+        setAdminPassword('');
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async (e) => {
+        e.preventDefault();
+        if (!adminPassword) return;
+
+        setIsDeleting(true);
+        try {
+            const res = await fetch(`/api/admin/contests/${contestToDelete._id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: adminPassword })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                toast.success('Contest deleted successfully');
+                setShowDeleteModal(false);
+                fetchContests();
+            } else {
+                toast.error(data.message || 'Failed to delete contest');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            toast.error('An error occurred while deleting');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -171,10 +211,19 @@ export default function ContestsPage() {
 
                             <div className="relative z-10">
                                 <div className="flex justify-between items-start mb-4">
-                                    <h3 className="font-bold text-lg text-white line-clamp-1 group-hover:text-indigo-300 transition-colors">{contest.title}</h3>
-                                    <span className={`px-2.5 py-1 text-xs rounded-full uppercase font-bold border shadow-sm ${getStatusColor(contest.status)}`}>
-                                        {contest.status}
-                                    </span>
+                                    <h3 className="font-bold text-lg text-white line-clamp-1 group-hover:text-indigo-300 transition-colors pr-20">{contest.title}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`px-2.5 py-1 text-xs rounded-full uppercase font-bold border shadow-sm ${getStatusColor(contest.status)}`}>
+                                            {contest.status}
+                                        </span>
+                                        <button 
+                                            onClick={(e) => handleDeleteClick(e, contest)}
+                                            className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all z-20"
+                                            title="Delete Contest"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                                 <p className="text-gray-400 text-sm mb-6 line-clamp-2 min-h-[40px] group-hover:text-gray-300 transition-colors">{contest.description || 'No description provided.'}</p>
 
@@ -217,6 +266,63 @@ export default function ContestsPage() {
                         </div>
                         <div className="px-6 pb-6">
                             <CreateContestForm onSuccess={handleContestCreated} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && contestToDelete && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-red-500/20 shadow-2xl overflow-hidden">
+                        <div className="p-6">
+                            <div className="flex items-center gap-4 mb-4 text-red-500">
+                                <div className="p-3 bg-red-500/10 rounded-full">
+                                    <AlertTriangle className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold">Delete Contest?</h3>
+                            </div>
+                            
+                            <p className="text-gray-400 mb-6">
+                                You are about to delete <span className="text-white font-semibold">{contestToDelete.title}</span>. 
+                                This action cannot be undone and will remove all associated data including problems and submissions.
+                            </p>
+
+                            <form onSubmit={confirmDelete}>
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                                        Admin Password Required
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={adminPassword}
+                                        onChange={(e) => setAdminPassword(e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all"
+                                        placeholder="Enter your password to confirm"
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDeleteModal(false)}
+                                        className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                                        disabled={isDeleting}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        disabled={isDeleting || !adminPassword}
+                                    >
+                                        {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                        {isDeleting ? 'Deleting...' : 'Delete Contest'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
