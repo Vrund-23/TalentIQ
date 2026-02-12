@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import dbConnect from '@/lib/db';
 import Contest from '@/models/Contest';
 import VolunteerDashboardClient from './VolunteerDashboardClient';
+import { serialize } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,9 +27,9 @@ export default async function VolunteerDashboard() {
     const upcomingContestsData = await Contest.find({ startTime: { $gt: now } }).sort({ startTime: 1 }).lean();
     const pastContestsData = await Contest.find({ endTime: { $lte: now } }).sort({ endTime: -1 }).lean();
 
-    const liveContests = JSON.parse(JSON.stringify(liveContestsData));
-    const upcomingContests = JSON.parse(JSON.stringify(upcomingContestsData));
-    const pastContests = JSON.parse(JSON.stringify(pastContestsData));
+    const liveContests = serialize(liveContestsData);
+    const upcomingContests = serialize(upcomingContestsData);
+    const pastContests = serialize(pastContestsData);
 
     const activeCount = liveContests.length;
     const upcomingCount = upcomingContests.length;

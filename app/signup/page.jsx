@@ -1,9 +1,9 @@
-'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+
 
 export default function SignupPage() {
     const router = useRouter();
@@ -15,6 +15,17 @@ export default function SignupPage() {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [emailValid, setEmailValid] = useState(null); // null, true, false
+
+    const emailRegex = /^[0-9]{2}[a-z]{2}[0-9]{3}@bvmengineering\.ac\.in$/;
+
+    useEffect(() => {
+        if (formData.email) {
+            setEmailValid(emailRegex.test(formData.email));
+        } else {
+            setEmailValid(null);
+        }
+    }, [formData.email]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,6 +38,12 @@ export default function SignupPage() {
 
         if (formData.password !== formData.confirmPassword) {
             setError("Passwords don't match");
+            setLoading(false);
+            return;
+        }
+
+        if (!emailValid) {
+            setError("Please use a valid college email address");
             setLoading(false);
             return;
         }
@@ -71,25 +88,71 @@ export default function SignupPage() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-[#94A3B8] mb-2">Full Name</label>
-                        <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="John Doe"
-                            className="w-full px-4 py-3 bg-[#1E293B] border border-[#3B82F6]/10 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none text-white placeholder-[#475569] transition-all" required />
+                        <label htmlFor="name" className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
+                        <input 
+                            id="name"
+                            type="text" 
+                            name="name" 
+                            value={formData.name} 
+                            onChange={handleChange} 
+                            placeholder="John Doe"
+                            className="w-full px-4 py-3 bg-slate-800 border border-primary/10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all" 
+                            required 
+                        />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-[#94A3B8] mb-2">College Email</label>
-                        <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="23cp045@bvmengineering.ac.in"
-                            className="w-full px-4 py-3 bg-[#1E293B] border border-[#3B82F6]/10 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none text-white placeholder-[#475569] transition-all" required />
-                        <p className="mt-1 text-xs text-[#475569]">Format: 2-digit Year + 2-letter Branch + 3-digit Roll No @bvmengineering.ac.in</p>
+                        <label htmlFor="email" className="block text-sm font-medium text-slate-400 mb-2">College Email</label>
+                        <div className="relative">
+                            <input 
+                                id="email"
+                                type="email" 
+                                name="email" 
+                                value={formData.email} 
+                                onChange={handleChange} 
+                                placeholder="23cp045@bvmengineering.ac.in"
+                                className={`w-full px-4 py-3 bg-slate-800 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all ${
+                                    emailValid === true ? 'border-green-500/50' : 
+                                    emailValid === false ? 'border-red-500/50' : 
+                                    'border-primary/10'
+                                }`} 
+                                required 
+                            />
+                            {emailValid === true && (
+                                <CheckCircle className="absolute right-3 top-3.5 w-5 h-5 text-green-500" />
+                            )}
+                            {emailValid === false && (
+                                <XCircle className="absolute right-3 top-3.5 w-5 h-5 text-red-500" />
+                            )}
+                        </div>
+                        <p className={`mt-1 text-xs transition-colors ${emailValid === false ? 'text-red-400' : 'text-slate-600'}`}>
+                            Format: 2-digit Year + 2-letter Branch + 3-digit Roll No @bvmengineering.ac.in
+                        </p>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-[#94A3B8] mb-2">Password</label>
-                        <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="••••••••"
-                            className="w-full px-4 py-3 bg-[#1E293B] border border-[#3B82F6]/10 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none text-white placeholder-[#475569] transition-all" required />
+                        <label htmlFor="password" className="block text-sm font-medium text-slate-400 mb-2">Password</label>
+                        <input 
+                            id="password"
+                            type="password" 
+                            name="password" 
+                            value={formData.password} 
+                            onChange={handleChange} 
+                            placeholder="••••••••"
+                            className="w-full px-4 py-3 bg-slate-800 border border-primary/10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all" 
+                            required 
+                        />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-[#94A3B8] mb-2">Confirm Password</label>
-                        <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="••••••••"
-                            className="w-full px-4 py-3 bg-[#1E293B] border border-[#3B82F6]/10 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none text-white placeholder-[#475569] transition-all" required />
+                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-400 mb-2">Confirm Password</label>
+                        <input 
+                            id="confirmPassword"
+                            type="password" 
+                            name="confirmPassword" 
+                            value={formData.confirmPassword} 
+                            onChange={handleChange} 
+                            placeholder="••••••••"
+                            className="w-full px-4 py-3 bg-slate-800 border border-primary/10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all" 
+                            required 
+                        />
                     </div>
                     <button type="submit" disabled={loading}
                         className="w-full py-3 px-4 mt-2 bg-[#3B82F6] hover:bg-[#2563EB] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg shadow-lg shadow-[#3B82F6]/20 transition-all duration-200 flex items-center justify-center">

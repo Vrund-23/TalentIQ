@@ -1,24 +1,35 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Users, Calendar, Trophy, Activity, TrendingUp, Clock, Plus, ArrowUpRight, Search, MoreHorizontal } from 'lucide-react';
+import Link from 'next/link';
+import { Users, Calendar, Trophy, Activity, TrendingUp, Clock, Plus, ArrowUpRight, Search, MoreHorizontal, Download, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState({ volunteers: 0, contests: 0, participants: 0 });
     const [topSolvers, setTopSolvers] = useState([]);
+    const [recentActivity, setRecentActivity] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [timeRange, setTimeRange] = useState('Last 30 Days');
+    const [generatingReport, setGeneratingReport] = useState(false);
 
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const [volRes, conRes, partRes] = await Promise.all([
+                const [volRes, conRes, partRes, actRes] = await Promise.all([
                     fetch('/api/admin/volunteers'),
                     fetch('/api/admin/contests'),
-                    fetch('/api/admin/participants')
+                    fetch('/api/admin/participants'),
+                    fetch('/api/admin/activity')
                 ]);
                 const volData = await volRes.json();
                 const conData = await conRes.json();
                 const partData = await partRes.json();
+                
+                let actData = [];
+                if (actRes.ok) {
+                    actData = await actRes.json();
+                }
 
                 setStats({
                     volunteers: volData.count || 0,
@@ -28,6 +39,10 @@ export default function AdminDashboard() {
 
                 if (partData.success && Array.isArray(partData.data)) {
                     setTopSolvers(partData.data.slice(0, 5));
+                }
+
+                if (Array.isArray(actData)) {
+                    setRecentActivity(actData.slice(0, 4));
                 }
             } catch (error) {
                 console.error("Error fetching stats", error);
@@ -45,12 +60,74 @@ export default function AdminDashboard() {
         { title: 'System Health', value: '98%', icon: Activity, color: 'text-[#10B981]', bg: 'from-[#10B981]/20 to-[#10B981]/5', trend: 'Stable', trendUp: true },
     ];
 
-    const recentActivity = [
-        { user: 'Sarah Connor', action: 'registered for', target: 'Hackathon 2024', time: '2 mins ago', icon: Users },
-        { user: 'Admin', action: 'updated contest', target: 'Code Wars', time: '1 hour ago', icon: Calendar },
-        { user: 'John Doe', action: 'joined as', target: 'Volunteer', time: '3 hours ago', icon: Plus },
-        { user: 'System', action: 'automated backup', target: 'Success', time: '5 hours ago', icon: Activity },
-    ];
+    const getIcon = (iconName) => {
+        switch (iconName) {
+            case 'Users': return Users;
+            case 'Calendar': return Calendar;
+            case 'Plus': return Plus;
+            case 'Activity': return Activity;
+            default: return Activity;
+        }
+    };
+
+    const handleTimeRangeChange = () => {
+        const ranges = ['Last 7 Days', 'Last 30 Days', 'All Time'];
+        const currentIndex = ranges.indexOf(timeRange);
+        const nextRange = ranges[(currentIndex + 1) % ranges.length];
+        setTimeRange(nextRange);
+        toast.success(`Time range updated to: ${nextRange}`);
+        // Here you would typically refetch data with the new range
+        // fetchStats(nextRange); 
+    };
+
+    const handleCreateReport = () => {
+        setGeneratingReport(true);
+        try {
+            // Generate CSV content
+            const csvRows = [];
+            
+            // Header
+            csvRows.push(['CodeArena Admin Report', new Date().toLocaleString()]);
+            csvRows.push([]);
+            
+            // Summary Stats
+            csvRows.push(['Summary Statistics']);
+            csvRows.push(['Metric', 'Value']);
+            cards.forEach(c => csvRows.push([c.title, c.value]));
+            csvRows.push([]);
+
+            // Top Solvers
+            csvRows.push(['Top Solvers']);
+            csvRows.push(['Rank', 'Name', 'Email', 'Problems Solved']);
+            topSolvers.forEach((s, i) => csvRows.push([i + 1, s.name, s.email, s.solvedCount]));
+            csvRows.push([]);
+
+            // Recent Activity
+            csvRows.push(['Recent Activity']);
+            csvRows.push(['User', 'Action', 'Target', 'Time']);
+            recentActivity.forEach(a => csvRows.push([a.user, a.action, a.target, new Date(a.timestamp).toLocaleString()]));
+
+            // Convert to CSV string
+            const csvContent = "data:text/csv;charset=utf-8," 
+                + csvRows.map(e => e.join(",")).join("\n");
+
+            // Download
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `admin_report_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            toast.success("Report generated successfully");
+        } catch (error) {
+            console.error("Report generation failed", error);
+            toast.error("Failed to generate report");
+        } finally {
+            setGeneratingReport(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -68,11 +145,24 @@ export default function AdminDashboard() {
                     <p className="text-[#94A3B8] mt-2">Welcome back, Admin. Here's what's happening today.</p>
                 </div>
                 <div className="flex gap-3">
-                    <button className="px-4 py-2 bg-[#111827] hover:bg-[#1E293B] text-white rounded-lg text-sm font-medium transition-colors border border-[#3B82F6]/10 flex items-center gap-2">
-                        <Clock className="w-4 h-4" /> Last 30 Days
+                    <button 
+                        onClick={handleTimeRangeChange}
+                        className="px-4 py-2 bg-[#111827] hover:bg-[#1E293B] text-white rounded-lg text-sm font-medium transition-colors border border-[#3B82F6]/10 flex items-center gap-2 min-w-[140px] justify-center"
+                    >
+                        <Clock className="w-4 h-4 text-[#94A3B8]" />
+                        {timeRange}
                     </button>
-                    <button className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-[#3B82F6]/20 flex items-center gap-2">
-                        <Plus className="w-4 h-4" /> Create Report
+                    <button 
+                        onClick={handleCreateReport}
+                        disabled={generatingReport}
+                        className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-[#3B82F6]/20 flex items-center gap-2 min-w-[150px] justify-center"
+                    >
+                        {generatingReport ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Download className="w-4 h-4" />
+                        )}
+                        {generatingReport ? 'Generating...' : 'Create Report'}
                     </button>
                 </div>
             </div>
@@ -162,28 +252,33 @@ export default function AdminDashboard() {
                         <MoreHorizontal className="w-5 h-5 text-[#475569] cursor-pointer hover:text-white" />
                     </div>
                     <div className="space-y-6">
-                        {recentActivity.map((item, index) => (
-                            <div key={index} className="flex gap-4 group">
-                                <div className="relative">
-                                    <div className="w-10 h-10 rounded-full bg-[#1E293B] border border-[#3B82F6]/10 flex items-center justify-center group-hover:border-[#3B82F6]/30 group-hover:bg-[#3B82F6]/10 transition-all">
-                                        <item.icon className="w-4 h-4 text-[#94A3B8]/60 group-hover:text-[#3B82F6]" />
+                        {recentActivity.map((item, index) => {
+                            const Icon = getIcon(item.icon);
+                            return (
+                                <div key={index} className="flex gap-4 group">
+                                    <div className="relative">
+                                        <div className="w-10 h-10 rounded-full bg-[#1E293B] border border-[#3B82F6]/10 flex items-center justify-center group-hover:border-[#3B82F6]/30 group-hover:bg-[#3B82F6]/10 transition-all">
+                                            <Icon className="w-4 h-4 text-[#94A3B8]/60 group-hover:text-[#3B82F6]" />
+                                        </div>
+                                        {index !== recentActivity.length - 1 && (
+                                            <div className="absolute top-10 left-1/2 -translate-x-1/2 w-px h-full bg-[#3B82F6]/5 my-2" />
+                                        )}
                                     </div>
-                                    {index !== recentActivity.length - 1 && (
-                                        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-px h-full bg-[#3B82F6]/5 my-2" />
-                                    )}
+                                    <div className="flex-1">
+                                        <p className="text-sm text-[#94A3B8]">
+                                            <span className="font-semibold text-white hover:underline cursor-pointer">{item.user}</span> {item.action} <span className="text-[#3B82F6]">{item.target}</span>
+                                        </p>
+                                        <p className="text-xs text-[#475569] mt-1" suppressHydrationWarning>{new Date(item.timestamp).toLocaleString()}</p>
+                                    </div>
                                 </div>
-                                <div className="flex-1">
-                                    <p className="text-sm text-[#94A3B8]">
-                                        <span className="font-semibold text-white hover:underline cursor-pointer">{item.user}</span> {item.action} <span className="text-[#3B82F6]">{item.target}</span>
-                                    </p>
-                                    <p className="text-xs text-[#475569] mt-1">{item.time}</p>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
-                    <button className="w-full mt-6 py-3 rounded-xl bg-[#1E293B] hover:bg-[#3B82F6]/10 text-sm font-medium text-[#94A3B8] hover:text-white transition-colors border border-[#3B82F6]/5">
-                        View All Activity
-                    </button>
+                    <Link href="/admin/activity">
+                        <button className="w-full mt-6 py-3 rounded-xl bg-[#1E293B] hover:bg-[#3B82F6]/10 text-sm font-medium text-[#94A3B8] hover:text-white transition-colors border border-[#3B82F6]/5">
+                            View All Activity
+                        </button>
+                    </Link>
                 </motion.div>
             </div>
 

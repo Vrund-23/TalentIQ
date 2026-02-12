@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Zap, Activity, Calendar as CalendarIcon, Users, Edit3, MonitorPlay, BarChart2, Plus, ArrowRight, Clock, LogOut } from 'lucide-react';
 import LogoutButton from '@/app/components/LogoutButton';
 import CreateContestForm from '@/app/components/CreateContestForm';
+import FormattedDate from '@/app/components/FormattedDate';
 
 export default function VolunteerDashboardClient({ session, liveContests, upcomingContests, pastContests, activeCount, upcomingCount, totalParticipants }) {
     const router = useRouter();
@@ -125,15 +126,18 @@ export default function VolunteerDashboardClient({ session, liveContests, upcomi
                 <div className="space-y-12">
 
                     {/* Live Section */}
-                    {activeCount > 0 && (
-                        <section>
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="h-8 w-1 bg-[#22D3EE] rounded-full" />
-                                <h3 className="text-xl font-bold text-white">Live Operations</h3>
+                    {/* Live Section */}
+                    <section>
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="h-8 w-1 bg-[#22D3EE] rounded-full" />
+                            <h3 className="text-xl font-bold text-white">Live Operations</h3>
+                            {activeCount > 0 && (
                                 <span className="px-2 py-0.5 bg-[#22D3EE]/15 text-[#22D3EE] text-xs font-bold rounded-full border border-[#22D3EE]/20">
                                     ACTION REQUIRED
                                 </span>
-                            </div>
+                            )}
+                        </div>
+                        {activeCount > 0 ? (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {liveContests.map(contest => (
                                     <div key={contest._id} className="bg-[#111827] border border-[#22D3EE]/20 rounded-2xl p-6 shadow-lg shadow-[#22D3EE]/5 relative overflow-hidden">
@@ -143,7 +147,7 @@ export default function VolunteerDashboardClient({ session, liveContests, upcomi
                                             <div className="flex justify-between items-start mb-4">
                                                 <div>
                                                     <h4 className="text-lg font-bold text-white">{contest.title}</h4>
-                                                    <p suppressHydrationWarning className="text-sm text-[#94A3B8]">Ends at {new Date(contest.endTime).toLocaleTimeString()}</p>
+                                                    <p className="text-sm text-[#94A3B8]">Ends at <FormattedDate date={contest.endTime} format="time" /></p>
                                                 </div>
                                                 <span className="flex items-center gap-1.5 text-xs font-bold text-[#22D3EE] bg-[#22D3EE]/10 border border-[#22D3EE]/20 px-3 py-1 rounded-full animate-pulse">
                                                     ● LIVE
@@ -177,8 +181,12 @@ export default function VolunteerDashboardClient({ session, liveContests, upcomi
                                     </div>
                                 ))}
                             </div>
-                        </section>
-                    )}
+                        ) : (
+                            <div className="text-center py-8 bg-[#111827]/50 rounded-2xl border border-[#3B82F6]/5 border-dashed">
+                                <p className="text-[#475569]">No live contests at the moment.</p>
+                            </div>
+                        )}
+                    </section>
 
                     {/* Upcoming Section */}
                     <section>
@@ -193,15 +201,15 @@ export default function VolunteerDashboardClient({ session, liveContests, upcomi
                                     <div key={contest._id} className="bg-[#111827] border border-[#3B82F6]/8 rounded-2xl p-6 hover:border-[#3B82F6]/20 transition-all group">
                                         <div className="flex justify-between items-start mb-4">
                                             <h4 className="text-lg font-bold text-white group-hover:text-[#3B82F6] transition-colors">{contest.title}</h4>
-                                            <span suppressHydrationWarning className="text-xs font-bold text-[#3B82F6] bg-[#3B82F6]/10 border border-[#3B82F6]/20 px-2 py-1 rounded">
-                                                {new Date(contest.startTime).toLocaleDateString()}
+                                            <span className="text-xs font-bold text-[#3B82F6] bg-[#3B82F6]/10 border border-[#3B82F6]/20 px-2 py-1 rounded">
+                                                <FormattedDate date={contest.startTime} />
                                             </span>
                                         </div>
 
                                         <div className="space-y-2 text-sm text-[#94A3B8]/60 mb-6">
                                             <div className="flex justify-between">
                                                 <span>Start Time:</span>
-                                                <span suppressHydrationWarning className="text-[#E2E8F0]/70">{new Date(contest.startTime).toLocaleTimeString()}</span>
+                                                <span className="text-[#E2E8F0]/70"><FormattedDate date={contest.startTime} format="time" /></span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span>Duration:</span>
@@ -242,13 +250,19 @@ export default function VolunteerDashboardClient({ session, liveContests, upcomi
                     </section>
 
                     {/* Past Section */}
-                    {pastContests.length > 0 && (
-                        <section className="opacity-80 hover:opacity-100 transition-opacity">
-                            <div className="flex items-center gap-3 mb-6">
+                    {/* Past Section */}
+                    <section className="opacity-80 hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
                                 <div className="h-8 w-1 bg-[#1E293B] rounded-full" />
                                 <h3 className="text-xl font-bold text-[#94A3B8]">Past Events</h3>
                             </div>
-
+                            <Link href="/dashboard/volunteer/contests/past" className="text-sm text-primary hover:text-primary-focus transition-colors">
+                                View All &rarr;
+                            </Link>
+                        </div>
+                        
+                        {pastContests.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {pastContests.slice(0, 3).map(contest => (
                                     <div key={contest._id} className="bg-[#111827] border border-[#3B82F6]/5 rounded-xl p-5 hover:bg-[#1E293B] transition-colors">
@@ -266,8 +280,12 @@ export default function VolunteerDashboardClient({ session, liveContests, upcomi
                                     </div>
                                 ))}
                             </div>
-                        </section>
-                    )}
+                        ) : (
+                            <div className="text-center py-8 bg-[#111827]/50 rounded-2xl border border-[#3B82F6]/5 border-dashed">
+                                <p className="text-[#475569]">No past events.</p>
+                            </div>
+                        )}
+                    </section>
 
                 </div>
             </main>

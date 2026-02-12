@@ -15,8 +15,8 @@ export default function LogoutButton() {
                 method: 'POST',
             });
             if (res.ok) {
+                router.push('/login');
                 router.refresh();
-                window.location.reload();
             }
         } catch (error) {
             console.error('Logout failed:', error);
