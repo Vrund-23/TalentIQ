@@ -1,3 +1,4 @@
+'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -89,33 +90,32 @@ export default function SignupPage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label htmlFor="name" className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
-                        <input 
+                        <input
                             id="name"
-                            type="text" 
-                            name="name" 
-                            value={formData.name} 
-                            onChange={handleChange} 
+                            type="text"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleChange}
                             placeholder="John Doe"
-                            className="w-full px-4 py-3 bg-slate-800 border border-primary/10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all" 
-                            required 
+                            className="w-full px-4 py-3 bg-slate-800 border border-primary/10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all"
+                            required
                         />
                     </div>
                     <div>
                         <label htmlFor="email" className="block text-sm font-medium text-slate-400 mb-2">College Email</label>
                         <div className="relative">
-                            <input 
+                            <input
                                 id="email"
-                                type="email" 
-                                name="email" 
-                                value={formData.email} 
-                                onChange={handleChange} 
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
                                 placeholder="23cp045@bvmengineering.ac.in"
-                                className={`w-full px-4 py-3 bg-slate-800 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all ${
-                                    emailValid === true ? 'border-green-500/50' : 
-                                    emailValid === false ? 'border-red-500/50' : 
-                                    'border-primary/10'
-                                }`} 
-                                required 
+                                className={`w-full px-4 py-3 bg-slate-800 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all ${emailValid === true ? 'border-green-500/50' :
+                                        emailValid === false ? 'border-red-500/50' :
+                                            'border-primary/10'
+                                    }`}
+                                required
                             />
                             {emailValid === true && (
                                 <CheckCircle className="absolute right-3 top-3.5 w-5 h-5 text-green-500" />
@@ -130,28 +130,28 @@ export default function SignupPage() {
                     </div>
                     <div>
                         <label htmlFor="password" className="block text-sm font-medium text-slate-400 mb-2">Password</label>
-                        <input 
+                        <input
                             id="password"
-                            type="password" 
-                            name="password" 
-                            value={formData.password} 
-                            onChange={handleChange} 
+                            type="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
                             placeholder="••••••••"
-                            className="w-full px-4 py-3 bg-slate-800 border border-primary/10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all" 
-                            required 
+                            className="w-full px-4 py-3 bg-slate-800 border border-primary/10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all"
+                            required
                         />
                     </div>
                     <div>
                         <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-400 mb-2">Confirm Password</label>
-                        <input 
+                        <input
                             id="confirmPassword"
-                            type="password" 
-                            name="confirmPassword" 
-                            value={formData.confirmPassword} 
-                            onChange={handleChange} 
+                            type="password"
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
                             placeholder="••••••••"
-                            className="w-full px-4 py-3 bg-slate-800 border border-primary/10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all" 
-                            required 
+                            className="w-full px-4 py-3 bg-slate-800 border border-primary/10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-white placeholder-slate-600 transition-all"
+                            required
                         />
                     </div>
                     <button type="submit" disabled={loading}
