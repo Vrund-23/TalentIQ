@@ -165,7 +165,7 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
                     tags: problem.tags ? (Array.isArray(problem.tags) ? problem.tags.join(', ') : problem.tags) : 'CodeChef',
                     inputFormat: problem.inputFormat || '',
                     outputFormat: problem.outputFormat || '',
-                    starterCode: { cpp: '', java: '', python: '', javascript: '' }
+                    starterCode: problem.starterCode || { cpp: '', java: '', python: '', javascript: '' }
                 }));
 
                 // Heuristic for difficulty if available in tags
@@ -176,7 +176,7 @@ export default function AddProblemForm({ contestId, onSuccess, initialData = nul
                     setTestCases(problem.testCases.map(tc => ({
                         input: tc.input || '',
                         output: tc.output || '',
-                        isPublic: true
+                        isPublic: tc.isPublic !== undefined ? tc.isPublic : true
                     })));
                 }
 

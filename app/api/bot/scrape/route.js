@@ -47,7 +47,10 @@ async function scrapeCodeChef(url) {
             // Remove MathJax and scripts to clean up
             const removeElements = (selector) => statementContainer.querySelectorAll(selector).forEach(el => el.remove());
             removeElements('.MathJax');
+            removeElements('.MathJax_Preview');
+            removeElements('.katex-mathml'); // IMPORTANT: Remove duplicate hidden math text
             removeElements('script');
+            removeElements('style');
 
             // 1. Title
             let title = cleanText(document.querySelector('h1')?.innerText);
@@ -185,35 +188,87 @@ export async function POST(req) {
         if (platform === 'codechef' || url.includes('codechef.com')) {
             data = await scrapeCodeChef(url);
 
-            // If AI enhancement is requested or if critical data is missing (like test cases), use Gemini
-            if (useAI || !data.testCases || data.testCases.length === 0) {
+            if (useAI || !data.testCases || data.testCases.length === 0 || !data.title) {
                 try {
                     // Import dynamically to avoid top-level await issues if not needed
                     const { GoogleGenerativeAI } = await import("@google/generative-ai");
                     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-                    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+                    // Use consistent model with generate-problem route
+                    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+                    // Retry helper (same as in generate-problem)
+                    async function generateWithRetry(payload, retries = 3) {
+                        for (let i = 0; i < retries; i++) {
+                            try {
+                                return await model.generateContent(payload);
+                            } catch (error) {
+                                const isOverloaded = error.message.includes('503') || error.message.includes('Overloaded');
+                                if (isOverloaded && i < retries - 1) {
+                                    await new Promise(r => setTimeout(r, 2000 * (i + 1)));
+                                    continue;
+                                }
+                                throw error;
+                            }
+                        }
+                    }
+
+                    // Prepare context about existing test cases
+                    const scrapedCount = data.testCases ? data.testCases.length : 0;
+                    const publicNeeded = Math.max(0, 2 - scrapedCount);
 
                     const prompt = `
                     You are an expert competitive programming assistant.
-                    I have scraped a problem from CodeChef but might have missed some details.
+                    I have scraped a problem from CodeChef.
                     
-                    Here is the raw text content of the problem statement:
+                    Here is the scraped raw text content:
                     """
                     ${data.rawText}
                     """
 
-                    Please analyze this text and extract the following in valid JSON format:
-                    - "testCases": An array of objects with "input" and "output" strings. Ensure you capture ALL sample test cases found.
-                    - "constraints": The constraints string if available.
-                    - "inputFormat": The input format description.
-                    - "outputFormat": The output format description.
-                    - "tags": An array of probable tags (e.g., "DP", "Greedy", "Math").
-                    - "difficulty": Estimate difficulty (Easy, Medium, Hard).
+                    Current Scraped Test Cases: ${scrapedCount}
+                    
+                    I strictly require a TOTAL of 5 Test Cases:
+                    - 2 PUBLIC Test Cases (I have ${scrapedCount}, so generate ${publicNeeded} more simple cases).
+                    - 3 PRIVATE Test Cases (Extreme Hard / Hidden).
 
-                    JSON Output:
+                    Please analyze the text and extract/generate the following in valid JSON format:
+                    {
+                        "title": "Extract exact title",
+                        "description": "Clean, readable problem statement summary (fix math symbols, remove duplicates)",
+                        "constraints": "Extract constraints",
+                        "inputFormat": "Extract input format. CRITICAL: Remove all LaTeX formatting (e.g., change $T$ to T, $10^5$ to 10^5). Make it clean and readable plain text.",
+                        "outputFormat": "Extract output format. CRITICAL: Remove all LaTeX formatting. Use clean plain text.",
+                        "tags": ["Tag1", "Tag2"],
+                        "difficulty": "Easy/Medium/Hard",
+                        "generatedPublicCases": [
+                            // Generate exactly ${publicNeeded} simple test cases here to complete the set of 2 public cases.
+                            // If ${publicNeeded} is 0, this array should be empty.
+                            { "input": "...", "output": "...", "isPublic": true }
+                        ],
+                        "hiddenTestCases": [
+                            // Generate exactly 3 EXTREME HARD hidden test cases.
+                            // Focus on: Max constraints, Edge cases (0, 1, negative, etc.), Time limit pressure.
+                            { "input": "...", "output": "...", "isPublic": false },
+                            { "input": "...", "output": "...", "isPublic": false },
+                            { "input": "...", "output": "...", "isPublic": false }
+                        ],
+                        "starterCode": {
+                            "cpp": "// Generated C++ starter...",
+                            "java": "// Generated Java starter...",
+                            "python": "# Generated Python starter...",
+                            "javascript": "// Generated JS starter..."
+                        }
+                    }
+
+                    For "starterCode":
+                    1. Class-based structure (class Solution).
+                    2. Empty method body (DO NOT SOLVE).
+                    3. Include driver code (main function) to handle input/output.
+
+                    Return ONLY the JSON.
                     `;
 
-                    const result = await model.generateContent(prompt);
+                    const result = await generateWithRetry(prompt);
                     const response = await result.response;
                     const text = response.text();
 
@@ -222,23 +277,57 @@ export async function POST(req) {
                     if (jsonMatch) {
                         const aiData = JSON.parse(jsonMatch[0]);
 
-                        // Merge AI data with scraped data (preferring AI for missing/empty fields)
-                        if ((!data.testCases || data.testCases.length === 0) && aiData.testCases) {
-                            data.testCases = aiData.testCases.map(tc => ({ ...tc, isPublic: true }));
+                        // Merge AI data with scraped data
+                        if (!data.title && aiData.title) data.title = aiData.title;
+                        if (aiData.description) data.description = aiData.description;
+
+                        // --- STRICT TEST CASE MERGING ---
+                        if (!data.testCases) data.testCases = [];
+
+                        // 1. Keep raw scraped cases (max 2)
+                        // If we scraped more than 2, we shouldn't really throw them away, 
+                        // but the user strictly said "2 public". 
+                        // Let's keep up to 2 scraped ones to be safe and consistent with the "Must 5" rule.
+                        // Or we can keep all scraped and strictly ensure we have *at least* 2 public?
+                        // User said: "must 5 test cases 2 public (one or two that we fetch... and other remaining generate)"
+                        // implying the final result should be 2 public.
+                        const keptScraped = data.testCases.slice(0, 2);
+                        keptScraped.forEach(tc => tc.isPublic = true);
+
+                        const finalTestCases = [...keptScraped];
+
+                        // 2. Add Generated Public Cases (if any needed)
+                        if (aiData.generatedPublicCases && Array.isArray(aiData.generatedPublicCases)) {
+                            aiData.generatedPublicCases.forEach(tc => {
+                                if (finalTestCases.length < 2) {
+                                    finalTestCases.push({ ...tc, isPublic: true });
+                                }
+                            });
                         }
+
+                        // 3. Add Generated Hidden Cases (Exactly 3)
+                        if (aiData.hiddenTestCases && Array.isArray(aiData.hiddenTestCases)) {
+                            // Take exactly 3 just in case AI hallucinates more
+                            const hidden = aiData.hiddenTestCases.slice(0, 3).map(tc => ({ ...tc, isPublic: false }));
+                            finalTestCases.push(...hidden);
+                        }
+
+                        // Assign back
+                        data.testCases = finalTestCases;
+
                         if (!data.constraints && aiData.constraints) data.constraints = aiData.constraints;
                         if (!data.inputFormat && aiData.inputFormat) data.inputFormat = aiData.inputFormat;
                         if (!data.outputFormat && aiData.outputFormat) data.outputFormat = aiData.outputFormat;
-                        if (aiData.tags) data.tags = aiData.tags; // scrape doesn't get tags usually
+                        if (aiData.tags) data.tags = aiData.tags;
                         if (aiData.difficulty) data.difficulty = aiData.difficulty;
+                        if (aiData.starterCode) data.starterCode = aiData.starterCode;
                     }
-
                 } catch (aiError) {
                     console.warn("AI Enhancement failed:", aiError);
-                    // Continue with scraped data
+                    // Continue with scraped data, but we might violate the 5-case rule if AI fails.
+                    // This is acceptable behavior for a fallback.
                 }
             }
-
         } else {
             return NextResponse.json({ error: "Platform not supported for scraping" }, { status: 400 });
         }

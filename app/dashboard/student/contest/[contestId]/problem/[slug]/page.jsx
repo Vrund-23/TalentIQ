@@ -2,9 +2,10 @@
 'use client';
 import { useState, useEffect, use } from 'react';
 import Editor from '@monaco-editor/react';
-import { Loader2, Play, Send, ArrowLeft, Code2, AlertCircle, Terminal, X, CheckCircle2, XCircle, History, FileText, RefreshCw, Eye } from 'lucide-react';
+import { Loader2, Play, Send, ArrowLeft, Code2, AlertCircle, Terminal, X, CheckCircle2, XCircle, History, FileText, RefreshCw, Eye, FileInput, FileOutput } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export default function ProblemPage({ params: paramsPromise }) {
     const params = use(paramsPromise);
@@ -99,6 +100,7 @@ export default function ProblemPage({ params: paramsPromise }) {
             }
         } catch (error) {
             console.error('Failed to fetch problem', error);
+            toast.error("Failed to load problem details");
         } finally {
             setLoading(false);
         }
@@ -119,6 +121,16 @@ export default function ProblemPage({ params: paramsPromise }) {
         }
     };
 
+    const checkCompilerHealth = (data) => {
+        if (data?.results?.some(r => r.message === 'Connection Error' || r.actualOutput?.includes('Connection Failed') || r.actualOutput?.includes('Judge0 API Error'))) {
+            toast.error("Compiler Service Unavailable", {
+                description: "The code execution server is currently unreachable. Please try again later."
+            });
+            return false;
+        }
+        return true;
+    };
+
     const handleSubmit = async () => {
         setIsSubmitting(true);
         setConsoleOpen(true);
@@ -137,11 +149,18 @@ export default function ProblemPage({ params: paramsPromise }) {
                 })
             });
             const data = await res.json();
-            setSubmissionResult(data);
 
-            // Refresh history if we are on that tab (allows user to see their new submission immediately)
-            if (leftPanelTab === 'submissions') {
-                fetchHistory(); // background fetch
+            if (checkCompilerHealth(data)) {
+                setSubmissionResult(data);
+                // Refresh history if we are on that tab (allows user to see their new submission immediately)
+                if (leftPanelTab === 'submissions') {
+                    fetchHistory(); // background fetch
+                }
+            } else {
+                setSubmissionResult({
+                    status: 'Error',
+                    message: 'Compiler Service Unavailable'
+                });
             }
 
         } catch (error) {
@@ -150,6 +169,7 @@ export default function ProblemPage({ params: paramsPromise }) {
                 status: 'Error',
                 message: 'Failed to submit code. Please check your connection.'
             });
+            toast.error("Submission Failed", { description: "Network error occurred." });
         } finally {
             setIsSubmitting(false);
         }
@@ -174,13 +194,22 @@ export default function ProblemPage({ params: paramsPromise }) {
                 })
             });
             const data = await res.json();
-            setSubmissionResult(data);
+
+            if (checkCompilerHealth(data)) {
+                setSubmissionResult(data);
+            } else {
+                setSubmissionResult({
+                    status: 'Error',
+                    message: 'Compiler Service Unavailable'
+                });
+            }
         } catch (error) {
             console.error(error);
             setSubmissionResult({
                 status: 'Error',
                 message: 'Failed to run code. Please check your connection.'
             });
+            toast.error("Run Failed", { description: "Network error occurred." });
         } finally {
             setIsRunning(false);
         }
@@ -194,6 +223,7 @@ export default function ProblemPage({ params: paramsPromise }) {
         // Update local storage explicitly
         localStorage.setItem(CODE_KEY, submissionCode);
         localStorage.setItem(LANG_KEY, submissionLang);
+        toast.success("Code restored from submission");
     };
 
     // Helper for formatting relative time
@@ -332,6 +362,43 @@ export default function ProblemPage({ params: paramsPromise }) {
                                             });
                                         })(problem.description)}
                                     </div>
+
+                                    {/* Input Format Section */}
+                                    {problem.inputFormat && (
+                                        <div>
+                                            <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                                <FileInput className="w-4 h-4 text-indigo-400" /> Input Format
+                                            </h3>
+                                            <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                                                <pre className="text-sm font-mono text-slate-300 whitespace-pre-wrap font-sans">{problem.inputFormat}</pre>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Output Format Section */}
+                                    {problem.outputFormat && (
+                                        <div>
+                                            <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                                <FileOutput className="w-4 h-4 text-indigo-400" /> Output Format
+                                            </h3>
+                                            <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                                                <pre className="text-sm font-mono text-slate-300 whitespace-pre-wrap font-sans">{problem.outputFormat}</pre>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Constraints Section */}
+                                    {problem.constraints && (
+                                        <div>
+                                            <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                                <AlertCircle className="w-4 h-4 text-indigo-400" /> Constraints
+                                            </h3>
+                                            <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                                                <pre className="text-sm font-mono text-slate-300 whitespace-pre-wrap">{problem.constraints}</pre>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="space-y-4">
                                         <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                             <Code2 className="w-4 h-4 text-indigo-400" /> Examples
@@ -351,16 +418,7 @@ export default function ProblemPage({ params: paramsPromise }) {
                                             </div>
                                         ))}
                                     </div>
-                                    {problem.constraints && (
-                                        <div>
-                                            <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-                                                <AlertCircle className="w-4 h-4 text-indigo-400" /> Constraints
-                                            </h3>
-                                            <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                                                <pre className="text-sm font-mono text-slate-300 whitespace-pre-wrap">{problem.constraints}</pre>
-                                            </div>
-                                        </div>
-                                    )}
+
                                 </div>
                             </>
                         )}
